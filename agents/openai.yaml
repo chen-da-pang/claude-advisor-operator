@@ -1,0 +1,4 @@
+interface:
+  display_name: "Claude Advisor Operator"
+  short_description: "Call Claude Code as an Opus advisor from Codex."
+  default_prompt: "Use $claude-advisor-operator to call advisor Claude for this decision."
