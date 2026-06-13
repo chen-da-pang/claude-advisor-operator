@@ -5,24 +5,47 @@
 [![Mode](https://img.shields.io/badge/default-read--only-16A34A)](#safety-model)
 [![Repository](https://img.shields.io/badge/status-public-0EA5E9)](https://github.com/chen-da-pang/claude-advisor-operator)
 
-Call Claude Code from Codex as a patient, read-only Opus advisor.
+Bring Claude Opus 4.8 into Codex as an external advisor for analysis,
+decisions, and final review gates.
 
-`claude-advisor-operator` is a Codex skill for teams and solo builders who want
-a second model to review high-stakes work without turning that review into a
-black box. It packages a reliable invocation pattern for local Claude Code:
-explicit context bundles, stdin prompt transport, stream-json progress, fixed
-session IDs, transcript lookup, debug logs, and a clear no-downgrade patience
-contract.
+`claude-advisor-operator` is a Codex skill for moments when Codex should not be
+the only mind in the room. Use it when a problem is too complex, the user is
+stuck between competing choices, Codex has already reasoned itself into a
+corner, or a Goal-mode task needs a second gate after Codex's own review.
+
+The skill packages a reliable bridge from Codex to local Claude Code running
+Opus: explicit context bundles, stdin prompt transport, stream-json progress,
+fixed session IDs, transcript lookup, debug logs, and a no-downgrade patience
+contract. Claude is not just a code reviewer here. Claude is the outside
+advisor: a model with a different reasoning path that can analyze the situation,
+challenge Codex's assumptions, recommend a decision, and catch omissions before
+the user moves on.
 
 ## Why This Exists
 
-Long advisor runs are easy to mishandle. A model can be working, reading files,
-or waiting on an API response while the caller only sees an empty output file.
-That ambiguity often leads to premature retries, smaller fallback prompts, or
-lost review sessions.
+Codex is powerful, but long-running work has failure modes that are not solved
+by asking Codex to think harder:
 
-This skill makes Claude advisor calls observable and repeatable:
+- The active context can become small, compressed, or lossy after many turns.
+- Complex decisions can require more context than a single Codex thread can
+  comfortably preserve.
+- Codex can miss issues during its own final review, especially near the end of
+  a Goal-mode task.
+- The user may be undecided and need an outside model to make a direct call.
+- A hard problem can benefit from a second model that is not trapped in Codex's
+  current assumptions.
 
+Claude advisor calls also need patience. Opus can be working, reading files, or
+waiting on an API response while the caller only sees an empty output file. That
+ambiguity often leads to premature retries, smaller fallback prompts, or lost
+review sessions.
+
+This skill solves both sides of the problem: it makes the external advisor easy
+to invoke, and it makes long Claude runs observable enough that Codex can wait
+instead of panicking.
+
+- **Outside-model judgment** - Claude receives a prepared case file and gives
+  Codex a decision, critique, or recommendation from a separate reasoning loop.
 - **No hidden context assumptions** - Codex writes a context bundle and tells
   Claude exactly what to inspect.
 - **No positional prompt footguns** - prompts go through stdin, avoiding
@@ -35,6 +58,27 @@ This skill makes Claude advisor calls observable and repeatable:
   tools.
 - **Patience built in** - Codex waits on process liveness, stream events,
   transcript growth, and debug-log movement before declaring a stall.
+
+## When To Use It
+
+Use this skill when you want Claude Opus to act as a serious advisor inside a
+Codex workflow:
+
+| Situation | What Claude should do |
+| --- | --- |
+| Codex is stuck or looping | Reframe the problem and identify the missing assumption |
+| The user is unsure between options | Recommend a decision with tradeoffs and confidence |
+| The task has outgrown the current context | Read a curated context bundle and restore the big picture |
+| Goal-mode work is ending | Run a second gate after Codex's own review |
+| A code/design/architecture choice is high-risk | Challenge the plan and point out hidden risks |
+| Codex produced a solution but something feels off | Audit the reasoning, not just the diff |
+| A long conversation has been compacted | Use an explicit bundle so the advisor sees what still matters |
+
+It is especially useful when the active Codex model has limited remaining
+context, has gone through automatic compaction, or has already spent many turns
+building local assumptions. Claude does not inherit the Codex conversation by
+magic; that is the point. Codex has to prepare the case clearly, and Claude gets
+to evaluate it from the outside.
 
 ## Installation
 
@@ -61,19 +105,23 @@ claude --version
 
 ## Usage
 
-Ask Codex to use the skill when you need Claude Code as an independent reviewer
-or technical advisor:
+Ask Codex to use the skill when you need Claude Code as an external advisor,
+decision-maker, analyst, or review gate:
 
 ```text
-Use $claude-advisor-operator to ask Claude whether this migration plan is safe.
+Use $claude-advisor-operator to ask Claude which of these two architecture paths we should choose.
 ```
 
 ```text
-Call advisor Claude with Opus high effort and have it review the patch before I proceed.
+Codex has been going in circles. Call advisor Claude and ask it to diagnose what we are missing.
 ```
 
 ```text
 This is a gate: do not continue until Claude advisor approves or explains the blocker.
+```
+
+```text
+We are near the end of the Goal. After Codex's review, call Claude Opus as the second gate.
 ```
 
 Codex will prepare a focused context bundle, invoke Claude through the local
@@ -90,6 +138,7 @@ The skill turns an advisor call into a structured run:
 3. Invoke Claude Code with Opus and a fixed session ID.
 4. Watch stream-json, stderr, debug logs, and Claude's project transcript.
 5. Parse the final `result` event and report model usage when available.
+6. Have Codex compare Claude's answer against local evidence before acting.
 
 The core invocation shape is:
 
@@ -117,7 +166,8 @@ test, and return contract.
 
 ## Safety Model
 
-By default, advisor Claude is intentionally scoped as a reviewer:
+By default, advisor Claude is intentionally scoped as an advisor, not an
+operator with write access:
 
 | Concern | Default |
 | --- | --- |
@@ -185,10 +235,12 @@ default prompts.
 ## Design Principles
 
 - Make the advisor call explicit, inspectable, and recoverable.
+- Use Claude Opus when Codex needs an outside mind, not just another summary.
 - Prefer structured context over raw repository dumps.
 - Keep Claude's default role advisory and read-only.
 - Treat advisor approval as a real gate when the user says it is a gate.
-- Preserve model independence: Claude reviews, Codex verifies and synthesizes.
+- Preserve model independence: Claude analyzes and decides; Codex verifies and
+  synthesizes.
 - Do not hide failures behind smaller fallback prompts.
 
 ## Validation
@@ -210,4 +262,3 @@ Skill is valid!
 
 This skill is intentionally small: one operating guide and one metadata file.
 It is designed to be copied, audited, and adapted without a framework install.
-
